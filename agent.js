@@ -8,6 +8,11 @@ import { z } from "zod";
 import { config } from "dotenv";
 config();
 
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+if (!GOOGLE_API_KEY) {
+  throw new Error("Missing GOOGLE_API_KEY in environment variables");
+}
+
 const model = 
 await initChatModel(
     
@@ -90,3 +95,21 @@ const calendarAgent = createAgent({
 
 
 // calendarAgent()
+
+
+
+const query = "Schedule a team meeting next Tuesday at 2pm for 1 hour";
+
+const stream = await calendarAgent.stream({
+  messages: [{ role: "user", content: query }]
+});
+
+for await (const step of stream) {
+  for (const update of Object.values(step)) {
+    if (update && typeof update === "object" && "messages" in update) {
+      for (const message of update.messages) {
+        console.log(message.toFormattedString());
+      }
+    }
+  }
+}
