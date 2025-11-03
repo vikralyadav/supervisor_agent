@@ -98,9 +98,126 @@ const calendarAgent = createAgent({
 
 
 
-const query = "Schedule a team meeting next Tuesday at 2pm for 1 hour";
+// const query = "Schedule a team meeting next Tuesday at 2pm for 1 hour";
 
-const stream = await calendarAgent.stream({
+// const stream = await calendarAgent.stream({
+//   messages: [{ role: "user", content: query }]
+// });
+
+// for await (const step of stream) {
+//   for (const update of Object.values(step)) {
+//     if (update && typeof update === "object" && "messages" in update) {
+//       for (const message of update.messages) {
+//         console.log(message.toFormattedString());
+//       }
+//     }
+//   }
+// }
+
+
+
+const EMAIL_AGENT_PROMPT = `
+You are an email assistant.
+Compose professional emails based on natural language requests.
+Extract recipient information and craft appropriate subject lines and body text.
+Use send_email to send the message.
+Always confirm what was sent in your final response.
+`.trim();
+
+const emailAgent = createAgent({
+  model: model,
+  tools: [sendEmail],
+  systemPrompt: EMAIL_AGENT_PROMPT,
+});
+
+// const query = "Send the design team a reminder about reviewing the new mockups";
+
+// const stream = await emailAgent.stream({
+//   messages: [{ role: "user", content: query }]
+// });
+
+// for await (const step of stream) {
+//   for (const update of Object.values(step)) {
+//     if (update && typeof update === "object" && "messages" in update) {
+//       for (const message of update.messages) {
+//         console.log(message.toFormattedString());
+//       }
+//     }
+//   }
+// }
+
+
+
+
+const scheduleEvent = tool(
+  async ({ request }) => {
+    const result = await calendarAgent.invoke({
+      messages: [{ role: "user", content: request }]
+    });
+    const lastMessage = result.messages[result.messages.length - 1];
+    return lastMessage.text;
+  },
+  {
+    name: "schedule_event",
+    description: `
+Schedule calendar events using natural language.
+
+Use this when the user wants to create, modify, or check calendar appointments.
+Handles date/time parsing, availability checking, and event creation.
+
+Input: Natural language scheduling request (e.g., 'meeting with design team next Tuesday at 2pm')
+    `.trim(),
+    schema: z.object({
+      request: z.string().describe("Natural language scheduling request"),
+    }),
+  }
+);
+
+const manageEmail = tool(
+  async ({ request }) => {
+    const result = await emailAgent.invoke({
+      messages: [{ role: "user", content: request }]
+    });
+    const lastMessage = result.messages[result.messages.length - 1];
+    return lastMessage.text;
+  },
+  {
+    name: "manage_email",
+    description: `
+Send emails using natural language.
+
+Use this when the user wants to send notifications, reminders, or any email communication.
+Handles recipient extraction, subject generation, and email composition.
+
+Input: Natural language email request (e.g., 'send them a reminder about the meeting')
+    `.trim(),
+    schema: z.object({
+      request: z.string().describe("Natural language email request"),
+    }),
+  }
+);
+
+
+
+
+const SUPERVISOR_PROMPT = `
+You are a helpful personal assistant.
+You can schedule calendar events and send emails.
+Break down user requests into appropriate tool calls and coordinate the results.
+When a request involves multiple actions, use multiple tools in sequence.
+`.trim();
+
+const supervisorAgent = createAgent({
+  model: model,
+  tools: [scheduleEvent, manageEmail],
+  systemPrompt: SUPERVISOR_PROMPT,
+});
+
+
+
+const query = "Schedule a team standup for tomorrow at 9am";
+
+const stream = await supervisorAgent.stream({
   messages: [{ role: "user", content: query }]
 });
 
